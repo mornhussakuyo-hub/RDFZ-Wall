@@ -1,6 +1,36 @@
-.venv/
+# Python cache
 __pycache__/
 *.pyc
-wall.db
-app/static/uploads/
+*.pyo
+
+# Virtual env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Env
 .env
+.env.*
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Upload files
+uploads/
+app/static/uploads/
+
+# Cache / test
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# System files
+.DS_Store
+Thumbs.db
