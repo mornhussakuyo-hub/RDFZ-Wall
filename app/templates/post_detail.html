@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}{{ post.title or ('帖子 #' ~ post.id) }} - {{ site_name }}{% endblock %}
+{% block content %}
+<article class="detail-card">
+    <div class="detail-header">
+        <div>
+            <div class="meta">发布时间：{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            <h1>{{ post.title or ('无标题 #' ~ post.id) }}</h1>
+        </div>
+        <div class="detail-stats">
+            <span class="chip large">👍 {{ like_count }}</span>
+            <span class="chip large">💬 {{ comment_count }}</span>
+        </div>
+    </div>
+
+    {% if post.content %}
+    <div class="detail-content">{{ post.content | e | replace('\n', '<br>') | safe }}</div>
+    {% endif %}
+
+    {% if post.videos %}
+    <section class="media-block">
+        <h2>视频</h2>
+        <div class="video-grid">
+            {% for video in post.videos %}
+            <video class="post-video" controls preload="metadata">
+                <source src="{{ video }}">
+                你的浏览器不支持视频播放。
+            </video>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if post.images %}
+    <section class="media-block">
+        <h2>图片</h2>
+        <div class="gallery">
+            {% for image in post.images %}
+            <a href="{{ image }}" target="_blank" rel="noopener noreferrer" class="gallery-item">
+                <img src="{{ image }}" alt="图片 {{ loop.index }}">
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section id="interact" class="interact-panel">
+        <div class="interact-row">
+            <div>
+                <h2>互动</h2>
+                <p class="meta">登录后即可点赞和评论。</p>
+            </div>
+            <form method="post" action="/posts/{{ post.id }}/like">
+                <button class="button {% if liked_by_me %}secondary{% else %}primary{% endif %}" type="submit">
+                    {% if liked_by_me %}取消点赞{% else %}点赞{% endif %}
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <section id="comments" class="comments-section">
+        <div class="section-head">
+            <div>
+                <h2>评论区</h2>
+                <p class="meta">共 {{ comment_count }} 条评论</p>
+            </div>
+        </div>
+
+        {% if current_user %}
+        <form method="post" action="/posts/{{ post.id }}/comments" class="comment-form">
+            <textarea name="content" rows="4" maxlength="1000" placeholder="说点什么吧……"></textarea>
+            <div class="submit-row">
+                <button class="button primary" type="submit">发布评论</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="login-tip">
+            <span>登录后可参与评论和点赞。</span>
+            <div class="hero-actions">
+                <a class="button primary small" href="/login?next=/posts/{{ post.id }}#comments">登录</a>
+                <a class="button secondary small" href="/register?next=/posts/{{ post.id }}#comments">注册</a>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if comments %}
+        <div class="comment-list">
+            {% for comment in comments %}
+            <article class="comment-item">
+                <div class="comment-head">
+                    <strong>{{ comment.user.username }}</strong>
+                    <span class="meta">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                <div class="comment-body">{{ comment.content | e | replace('\n', '<br>') | safe }}</div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state compact">还没有评论，来做第一个发言的人吧。</div>
+        {% endif %}
+    </section>
+
+    <div class="back-row">
+        <a class="button ghost" href="/">返回首页</a>
+    </div>
+</article>
+{% endblock %}

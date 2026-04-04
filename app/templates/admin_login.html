@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}管理员登录 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="form-card narrow auth-card">
+    <div class="auth-header">
+        <span class="eyebrow">Admin Portal</span>
+        <h1>管理员登录</h1>
+    </div>
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+    <form method="post" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>
+            <span>用户名</span>
+            <input type="text" name="username" required>
+        </label>
+        <label>
+            <span>密码</span>
+            <input type="password" name="password" required>
+        </label>
+        <button class="button primary" type="submit">登录后台</button>
+    </form>
+</div>
+{% endblock %}

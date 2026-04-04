@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}登录 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="form-card narrow auth-card">
+    <div class="auth-header">
+        <span class="eyebrow">Welcome Back</span>
+        <h1>用户登录</h1>
+        <p class="meta">登录后可以点赞和评论。</p>
+    </div>
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+    <form method="post" class="form-grid">
+        <input type="hidden" name="next_url" value="{{ next_url }}">
+        <label>
+            <span>用户名</span>
+            <input type="text" name="username" required>
+        </label>
+        <label>
+            <span>密码</span>
+            <input type="password" name="password" required>
+        </label>
+        <button class="button primary" type="submit">登录</button>
+    </form>
+    <div class="switch-auth">还没有账号？<a href="/register?next={{ encoded_next_url }}">去注册</a></div>
+</div>
+{% endblock %}

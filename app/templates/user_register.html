@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}注册 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="form-card narrow auth-card">
+    <div class="auth-header">
+        <span class="eyebrow">Join the Wall</span>
+        <h1>注册账号</h1>
+        <p class="meta">注册后就能点赞、评论，参与校园墙互动。</p>
+    </div>
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+    <form method="post" class="form-grid">
+        <input type="hidden" name="next_url" value="{{ next_url }}">
+        <label>
+            <span>用户名</span>
+            <input type="text" name="username" minlength="3" maxlength="50" required>
+        </label>
+        <label>
+            <span>密码</span>
+            <input type="password" name="password" minlength="6" required>
+        </label>
+        <label>
+            <span>确认密码</span>
+            <input type="password" name="confirm_password" minlength="6" required>
+        </label>
+        <button class="button primary" type="submit">注册并登录</button>
+    </form>
+    <div class="switch-auth">已经有账号？<a href="/login?next={{ encoded_next_url }}">去登录</a></div>
+</div>
+{% endblock %}

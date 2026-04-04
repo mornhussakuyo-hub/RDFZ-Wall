@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="page-shell">
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="/" class="brand">
+                <span class="brand-mark">✦</span>
+                <span>{{ site_name }}</span>
+            </a>
+            <nav class="main-nav">
+                <a href="/">首页</a>
+                {% if current_user %}
+                <span class="nav-user">你好，{{ current_user.username }}</span>
+                <form method="post" action="/logout">
+                    <button class="button ghost small" type="submit">退出</button>
+                </form>
+                {% else %}
+                <a href="/login">登录</a>
+                <a href="/register">注册</a>
+                {% endif %}
+                <a href="/admin/posts">后台</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container page-body">
+        {% if flash %}
+        <div class="alert {{ flash.level }}">{{ flash.message }}</div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <div>
+                <strong>{{ site_name }}</strong>
+                <div class="footer-copy">由 MornHus 开发。</div>
+            </div>
+            <div class="footer-copy">Built with FastAPI · Campus Wall</div>
+        </div>
+    </footer>
+</div>
+</body>
+</html>

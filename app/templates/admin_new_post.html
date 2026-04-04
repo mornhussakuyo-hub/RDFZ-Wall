@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}新建帖子 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="admin-toolbar">
+    <div>
+        <span class="eyebrow">Publish</span>
+        <h1>新建帖子</h1>
+        <div class="meta">当前管理员：{{ admin.username }}</div>
+    </div>
+    <div class="toolbar-actions">
+        <a class="button secondary" href="/admin/posts">返回管理页</a>
+    </div>
+</div>
+
+<div class="form-card">
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label>
+            <span>标题（可空）</span>
+            <input type="text" name="title" maxlength="200" value="{{ title_value }}" placeholder="比如：今天的投稿 #12">
+        </label>
+
+        <label>
+            <span>正文（可空）</span>
+            <textarea name="content" rows="8" placeholder="可以贴文字，也可以只发截图或视频。">{{ content_value }}</textarea>
+        </label>
+
+        <div class="two-col-form">
+            <label>
+                <span>上传截图 / 图片（可多选）</span>
+                <input type="file" name="images" accept="image/*" multiple>
+                <small class="hint">支持 jpg / jpeg / png / webp / gif，最多 9 张。</small>
+            </label>
+
+            <label>
+                <span>上传视频（可多选）</span>
+                <input type="file" name="videos" accept="video/mp4,video/webm,video/quicktime,.m4v" multiple>
+                <small class="hint">支持 mp4 / webm / mov / m4v，最多 3 个。</small>
+            </label>
+        </div>
+
+        <div class="submit-row">
+            <button class="button primary" type="submit">直接发布</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

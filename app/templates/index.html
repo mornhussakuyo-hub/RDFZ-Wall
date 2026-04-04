@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}{{ site_name }}{% endblock %}
+{% block content %}
+<section class="hero hero-large">
+    <div class="hero-text">
+        <span class="eyebrow">校园分享 · 实时互动</span>
+        <h1>{{ site_name }}</h1>
+        <p>崇德，博学，创新，求实。</p>
+        <div class="hero-actions">
+            {% if current_user %}
+            <a class="button primary" href="#feed">去看帖子</a>
+            {% else %}
+            <a class="button primary" href="/register">注册账号</a>
+            <a class="button secondary" href="/login">登录参与互动</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="hero-panel">
+        <div class="stat-card">
+            <strong>{{ posts|length }}</strong>
+            <span>已发布帖子</span>
+        </div>
+        <div class="stat-card">
+            <strong>{{ total_like_count }}</strong>
+            <span>累计点赞</span>
+        </div>
+        <div class="stat-card">
+            <strong>{{ total_comment_count }}</strong>
+            <span>累计评论</span>
+        </div>
+    </div>
+</section>
+
+{% if posts %}
+<section id="feed" class="section-head">
+    <div>
+        <h2>最新帖子</h2>
+        <p class="meta">封面、标题、摘要、互动数据都在首页直接可见。</p>
+    </div>
+</section>
+<div class="post-grid">
+    {% for post in posts %}
+    <article class="card post-card">
+        <a class="card-cover" href="/posts/{{ post.id }}">
+            {% if post.cover %}
+            <img src="{{ post.cover }}" alt="帖子封面">
+            {% elif post.videos %}
+            <div class="cover-placeholder video-placeholder">
+                <span>🎬</span>
+                <span>视频帖子</span>
+            </div>
+            {% else %}
+            <div class="cover-placeholder">暂无封面</div>
+            {% endif %}
+        </a>
+        <div class="card-body">
+            <div class="meta-row">
+                <span class="meta">{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <div class="chips">
+                    {% if post.videos %}<span class="chip">视频 {{ post.videos|length }}</span>{% endif %}
+                    {% if post.images %}<span class="chip">图片 {{ post.images|length }}</span>{% endif %}
+                </div>
+            </div>
+            <h2><a href="/posts/{{ post.id }}">{{ post.title or ('无标题 #' ~ post.id) }}</a></h2>
+            <p class="excerpt">{{ (post.content or '这条帖子没有正文，点击查看完整内容。')[:120] }}{% if post.content and (post.content|length) > 120 %}...{% endif %}</p>
+            <div class="card-footer">
+                <span>👍 {{ like_counts.get(post.id, 0) }}</span>
+                <span>💬 {{ comment_counts.get(post.id, 0) }}</span>
+                <a class="text-link" href="/posts/{{ post.id }}">查看详情 →</a>
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">这里还没有帖子……</div>
+{% endif %}
+{% endblock %}

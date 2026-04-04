@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}后台管理 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="admin-toolbar">
+    <div>
+        <span class="eyebrow">Dashboard</span>
+        <h1>帖子管理</h1>
+        <div class="meta">当前管理员：{{ admin.username }}</div>
+    </div>
+    <div class="toolbar-actions toolbar-actions-row">
+        <a class="button primary" href="/admin/posts/new">新建帖子</a>
+        <form method="post" action="/admin/logout">
+            <button class="button ghost" type="submit">退出登录</button>
+        </form>
+    </div>
+</div>
+
+{% if posts %}
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>标题</th>
+                <th>图片</th>
+                <th>视频</th>
+                <th>发布时间</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in posts %}
+            <tr>
+                <td>{{ post.id }}</td>
+                <td>{{ post.title or ('无标题 #' ~ post.id) }}</td>
+                <td>{{ post.images|length }}</td>
+                <td>{{ post.videos|length }}</td>
+                <td>{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    {% if post.is_deleted %}
+                    <span class="badge muted">已删除</span>
+                    {% else %}
+                    <span class="badge ok">已发布</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="row-actions">
+                        <a class="button secondary small" href="/posts/{{ post.id }}" target="_blank">查看</a>
+                        {% if not post.is_deleted %}
+                        <form method="post" action="/admin/posts/{{ post.id }}/delete" onsubmit="return confirm('确认删除这条帖子？');">
+                            <button class="button danger small" type="submit">删除</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">后台还没有任何帖子，先去发第一篇。</div>
+{% endif %}
+{% endblock %}
