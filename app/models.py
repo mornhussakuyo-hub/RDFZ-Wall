@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import List
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
+
+
+def cn_now():
+    return datetime.now(ZoneInfo("Asia/Shanghai"))
 
 
 class JsonListFieldMixin:
@@ -28,7 +33,7 @@ class Admin(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now)
 
 
 class User(Base):
@@ -37,7 +42,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now)
 
     comments: Mapped[list['Comment']] = relationship(back_populates='user', cascade='all, delete-orphan')
     likes: Mapped[list['PostLike']] = relationship(back_populates='user', cascade='all, delete-orphan')
@@ -52,8 +57,8 @@ class Post(Base, JsonListFieldMixin):
     images_json: Mapped[str] = mapped_column(Text, default='[]')
     videos_json: Mapped[str] = mapped_column(Text, default='[]')
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    published_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now)
+    published_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now, index=True)
 
     comments: Mapped[list['Comment']] = relationship(back_populates='post', cascade='all, delete-orphan')
     likes: Mapped[list['PostLike']] = relationship(back_populates='post', cascade='all, delete-orphan')
@@ -88,7 +93,7 @@ class Comment(Base):
     post_id: Mapped[int] = mapped_column(ForeignKey('posts.id', ondelete='CASCADE'), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
     content: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now, index=True)
 
     post: Mapped['Post'] = relationship(back_populates='comments')
     user: Mapped['User'] = relationship(back_populates='comments')
@@ -101,7 +106,7 @@ class PostLike(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     post_id: Mapped[int] = mapped_column(ForeignKey('posts.id', ondelete='CASCADE'), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now)
 
     post: Mapped['Post'] = relationship(back_populates='likes')
     user: Mapped['User'] = relationship(back_populates='likes')

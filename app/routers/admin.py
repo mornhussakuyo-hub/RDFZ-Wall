@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import List
 
@@ -31,6 +32,10 @@ from ..models import Admin, Post
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 router = APIRouter(prefix='/admin', tags=['admin'])
 
+
+
+def cn_now():
+    return datetime.now(ZoneInfo("Asia/Shanghai"))
 
 def redirect_to_login() -> RedirectResponse:
     return RedirectResponse(url='/admin/login', status_code=status.HTTP_303_SEE_OTHER)
@@ -282,8 +287,8 @@ def create_post(
     post = Post(
         title=clean_title,
         content=clean_content,
-        created_at=datetime.utcnow(),
-        published_at=datetime.utcnow(),
+        created_at=cn_now(),
+        published_at=cn_now(),
     )
     post.images = image_paths
     post.videos = video_paths
