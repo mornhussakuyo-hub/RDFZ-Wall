@@ -34,3 +34,5 @@ app/static/uploads/
 # System files
 .DS_Store
 Thumbs.db
+
+.zip
