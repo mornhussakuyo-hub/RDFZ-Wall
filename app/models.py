@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 from typing import List
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -12,7 +12,10 @@ from .db import Base
 
 
 def cn_now():
-    return datetime.now(ZoneInfo("Asia/Shanghai"))
+    try:
+        return datetime.now(ZoneInfo("Asia/Shanghai"))
+    except ZoneInfoNotFoundError:
+        return datetime.now(timezone(timedelta(hours=8)))
 
 
 class JsonListFieldMixin:
@@ -46,6 +49,10 @@ class User(Base):
 
     comments: Mapped[list['Comment']] = relationship(back_populates='user', cascade='all, delete-orphan')
     likes: Mapped[list['PostLike']] = relationship(back_populates='user', cascade='all, delete-orphan')
+    summary_usages: Mapped[list['PostSummaryUsage']] = relationship(
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
 
 
 class Post(Base, JsonListFieldMixin):
@@ -59,9 +66,16 @@ class Post(Base, JsonListFieldMixin):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now)
     published_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now, index=True)
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ai_summary_generating: Mapped[bool] = mapped_column(Boolean, default=False)
 
     comments: Mapped[list['Comment']] = relationship(back_populates='post', cascade='all, delete-orphan')
     likes: Mapped[list['PostLike']] = relationship(back_populates='post', cascade='all, delete-orphan')
+    summary_usages: Mapped[list['PostSummaryUsage']] = relationship(
+        back_populates='post',
+        cascade='all, delete-orphan',
+    )
 
     @property
     def images(self) -> List[str]:
@@ -110,3 +124,16 @@ class PostLike(Base):
 
     post: Mapped['Post'] = relationship(back_populates='likes')
     user: Mapped['User'] = relationship(back_populates='likes')
+
+
+class PostSummaryUsage(Base):
+    __tablename__ = 'post_summary_usages'
+    __table_args__ = (UniqueConstraint('post_id', 'user_id', name='uq_post_summary_usage_user'),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey('posts.id', ondelete='CASCADE'), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now, index=True)
+
+    post: Mapped['Post'] = relationship(back_populates='summary_usages')
+    user: Mapped['User'] = relationship(back_populates='summary_usages')

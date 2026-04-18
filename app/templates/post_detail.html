@@ -1,107 +1,198 @@
 {% extends 'base.html' %}
 {% block title %}{{ post.title or ('帖子 #' ~ post.id) }} - {{ site_name }}{% endblock %}
 {% block content %}
-<article class="detail-card">
-    <div class="detail-header">
-        <div>
-            <div class="meta">发布时间：{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</div>
-            <h1>{{ post.title or ('无标题 #' ~ post.id) }}</h1>
-        </div>
-        <div class="detail-stats">
-            <span class="chip large">👍 {{ like_count }}</span>
-            <span class="chip large">💬 {{ comment_count }}</span>
-        </div>
-    </div>
-
-    {% if post.content %}
-    <div class="detail-content">{{ post.content | e | replace('\n', '<br>') | safe }}</div>
-    {% endif %}
-
-    {% if post.videos %}
-    <section class="media-block">
-        <h2>视频</h2>
-        <div class="video-grid">
-            {% for video in post.videos %}
-            <video class="post-video" controls preload="metadata">
-                <source src="{{ video }}">
-                你的浏览器不支持视频播放。
-            </video>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
-    {% if post.images %}
-    <section class="media-block">
-        <h2>图片</h2>
-        <div class="gallery">
-            {% for image in post.images %}
-            <a href="{{ image }}" target="_blank" rel="noopener noreferrer" class="gallery-item">
-                <img src="{{ image }}" alt="图片 {{ loop.index }}">
-            </a>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
-    <section id="interact" class="interact-panel">
-        <div class="interact-row">
+<div class="detail-layout">
+    <article class="detail-card">
+        <div class="detail-header">
             <div>
-                <h2>互动</h2>
-                <p class="meta">登录后即可点赞和评论。</p>
+                <div class="meta">发布时间：{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                <h1>{{ post.title or ('无标题 #' ~ post.id) }}</h1>
             </div>
-            <form method="post" action="/posts/{{ post.id }}/like">
-                <button class="button {% if liked_by_me %}secondary{% else %}primary{% endif %}" type="submit">
-                    {% if liked_by_me %}取消点赞{% else %}点赞{% endif %}
-                </button>
-            </form>
-        </div>
-    </section>
-
-    <section id="comments" class="comments-section">
-        <div class="section-head">
-            <div>
-                <h2>评论区</h2>
-                <p class="meta">共 {{ comment_count }} 条评论</p>
+            <div class="detail-stats">
+                <span class="chip large">👍 {{ like_count }}</span>
+                <span class="chip large">💬 {{ comment_count }}</span>
             </div>
         </div>
 
-        {% if current_user %}
-        <form method="post" action="/posts/{{ post.id }}/comments" class="comment-form">
-            <textarea name="content" rows="4" maxlength="1000" placeholder="说点什么吧……"></textarea>
-            <div class="submit-row">
-                <button class="button primary" type="submit">发布评论</button>
-            </div>
-        </form>
-        {% else %}
-        <div class="login-tip">
-            <span>登录后可参与评论和点赞。</span>
-            <div class="hero-actions">
-                <a class="button primary small" href="/login?next=/posts/{{ post.id }}#comments">登录</a>
-                <a class="button secondary small" href="/register?next=/posts/{{ post.id }}#comments">注册</a>
-            </div>
-        </div>
+        {% if post.content %}
+        <div class="detail-content">{{ post.content | e | replace('\n', '<br>') | safe }}</div>
         {% endif %}
 
-        {% if comments %}
-        <div class="comment-list">
-            {% for comment in comments %}
-            <article class="comment-item">
-                <div class="comment-head">
-                    <strong>{{ comment.user.username }}</strong>
-                    <span class="meta">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        {% if post.videos %}
+        <section class="media-block">
+            <h2>视频</h2>
+            <div class="video-grid">
+                {% for video in post.videos %}
+                <video class="post-video" controls preload="metadata">
+                    <source src="{{ video }}">
+                    你的浏览器不支持视频播放。
+                </video>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if post.images %}
+        <section class="media-block">
+            <h2>图片</h2>
+            <div class="gallery">
+                {% for image in post.images %}
+                <a href="{{ image }}" target="_blank" rel="noopener noreferrer" class="gallery-item">
+                    <img src="{{ image }}" alt="图片 {{ loop.index }}">
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section id="interact" class="interact-panel">
+            <div class="interact-row">
+                <div>
+                    <h2>互动</h2>
+                    <p class="meta">登录后即可点赞和评论。</p>
                 </div>
-                <div class="comment-body">{{ comment.content | e | replace('\n', '<br>') | safe }}</div>
-            </article>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-state compact">还没有评论，来做第一个发言的人吧。</div>
-        {% endif %}
-    </section>
+                <form method="post" action="/posts/{{ post.id }}/like">
+                    <button class="button {% if liked_by_me %}secondary{% else %}primary{% endif %}" type="submit">
+                        {% if liked_by_me %}取消点赞{% else %}点赞{% endif %}
+                    </button>
+                </form>
+            </div>
+        </section>
 
-    <div class="back-row">
-        <a class="button ghost" href="/">返回首页</a>
-    </div>
-</article>
+        <section id="comments" class="comments-section">
+            <div class="section-head">
+                <div>
+                    <h2>评论区</h2>
+                    <p class="meta">共 {{ comment_count }} 条评论</p>
+                </div>
+            </div>
+
+            {% if current_user %}
+            <form method="post" action="/posts/{{ post.id }}/comments" class="comment-form">
+                <textarea name="content" rows="4" maxlength="1000" placeholder="说点什么吧……"></textarea>
+                <div class="submit-row">
+                    <button class="button primary" type="submit">发布评论</button>
+                </div>
+            </form>
+            {% else %}
+            <div class="login-tip">
+                <span>登录后可参与评论和点赞。</span>
+                <div class="hero-actions">
+                    <a class="button primary small" href="/login?next=/posts/{{ post.id }}#comments">登录</a>
+                    <a class="button secondary small" href="/register?next=/posts/{{ post.id }}#comments">注册</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if comments %}
+            <div class="comment-list">
+                {% for comment in comments %}
+                <article class="comment-item">
+                    <div class="comment-head">
+                        <strong>{{ comment.user.username }}</strong>
+                        <span class="meta">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    <div class="comment-body">{{ comment.content | e | replace('\n', '<br>') | safe }}</div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state compact">还没有评论，来做第一个发言的人吧。</div>
+            {% endif %}
+        </section>
+
+        <div class="back-row">
+            <a class="button ghost" href="/">返回首页</a>
+        </div>
+    </article>
+
+    <aside
+        class="card ai-summary-card"
+        data-ai-summary-panel
+        data-endpoint="/posts/{{ post.id }}/ai-summary"
+        data-ready="{{ 'true' if ai_summary_configured else 'false' }}"
+        data-logged-in="{{ 'true' if current_user else 'false' }}"
+        data-used="{{ 'true' if summary_used_by_me else 'false' }}"
+    >
+        <div class="ai-summary-top">
+            <span class="eyebrow">AI Summary</span>
+            <span class="badge {% if summary_used_by_me %}ok{% else %}muted{% endif %}" data-ai-summary-badge>
+                {% if summary_used_by_me %}已使用{% elif post.ai_summary %}待读取{% else %}待生成{% endif %}
+            </span>
+        </div>
+        <div class="ai-summary-header">
+            <div>
+                <h2>AI 一键解读</h2>
+                <p class="meta">为什么不问问神奇海螺呢？</p>
+            </div>
+        </div>
+        <button
+            class="button primary ai-summary-button"
+            type="button"
+            data-ai-summary-button
+            {% if not ai_summary_configured or not current_user or summary_used_by_me %}disabled{% endif %}
+        >
+            {% if not current_user %}
+            登录后使用
+            {% elif summary_used_by_me %}
+            已使用过
+            {% elif post.ai_summary %}
+            查看 AI 解释
+            {% else %}
+            生成 AI 解释
+            {% endif %}
+        </button>
+        <div
+            class="ai-summary-status {% if not ai_summary_configured or not current_user %}is-error{% else %}is-info{% endif %}"
+            data-ai-summary-status
+            {% if ai_summary_configured and current_user and not summary_used_by_me %}hidden{% endif %}
+        >
+            {% if not ai_summary_configured %}
+            请先在 .env 中配置 AI_SUMMARY_API_KEY 和 AI_SUMMARY_BASE_URL。
+            {% elif not current_user %}
+            请先登录后再使用 AI 总结功能。
+            {% else %}
+            你已经使用过本帖 AI 总结了。
+            {% endif %}
+        </div>
+        {% if not current_user %}
+        <div class="hero-actions ai-summary-auth">
+            <a class="button primary small" href="/login?next=/posts/{{ post.id }}">登录</a>
+            <a class="button secondary small" href="/register?next=/posts/{{ post.id }}">注册</a>
+        </div>
+        {% endif %}
+        <div class="ai-summary-box">
+            <div class="ai-summary-placeholder" data-ai-summary-placeholder {% if summary_visible %}hidden{% endif %}>
+                {% if not current_user %}
+                登录后可使用 AI 总结；每个账号在本帖只有 1 次使用机会。
+                {% elif summary_used_by_me and not post.ai_summary %}
+                你已使用过本帖 AI 总结，但当前没有可展示的总结内容。
+                {% elif post.ai_summary %}
+                本帖已有缓存总结，点击按钮即可消耗一次使用资格并查看。
+                {% else %}
+                点击按钮后，AI 会抓取本帖正文与图片内容，生成一段简短总结。
+                {% endif %}
+            </div>
+            <div class="ai-summary-content" data-ai-summary-content {% if not summary_visible %}hidden{% endif %}>
+                {{ post.ai_summary | e | replace('\n', '<br>') | safe }}
+            </div>
+        </div>
+        <div class="ai-summary-meta" data-ai-summary-meta>
+            {% if not current_user %}
+            登录后可用；每个用户每帖仅 1 次
+            {% elif summary_used_by_me %}
+            你已使用过本帖 AI 总结
+            {% elif post.ai_summary_updated_at %}
+            当前有缓存总结，最近生成：{{ post.ai_summary_updated_at.strftime('%Y-%m-%d %H:%M') }}
+            {% elif post.images %}
+            你还有 1 次使用机会；当前可分析 {{ post.images|length }} 张图片
+            {% else %}
+            你还有 1 次使用机会；当前将以帖子文本内容为主
+            {% endif %}
+        </div>
+    </aside>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/post_ai_summary.js"></script>
 {% endblock %}

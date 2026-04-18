@@ -39,3 +39,9 @@ def initialize_database() -> None:
             columns = {column['name'] for column in inspector.get_columns('posts')}
             if 'videos_json' not in columns:
                 conn.execute(text("ALTER TABLE posts ADD COLUMN videos_json TEXT NOT NULL DEFAULT '[]'"))
+            if 'ai_summary' not in columns:
+                conn.execute(text("ALTER TABLE posts ADD COLUMN ai_summary TEXT"))
+            if 'ai_summary_updated_at' not in columns:
+                conn.execute(text("ALTER TABLE posts ADD COLUMN ai_summary_updated_at DATETIME"))
+            if 'ai_summary_generating' not in columns:
+                conn.execute(text("ALTER TABLE posts ADD COLUMN ai_summary_generating BOOLEAN NOT NULL DEFAULT 0"))

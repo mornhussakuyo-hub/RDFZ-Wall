@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import logging
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -18,13 +19,20 @@ from ..auth import (
     set_flash,
     verify_password,
 )
-from ..config import SITE_NAME, TEMPLATE_DIR
+from ..config import AI_SUMMARY_MAX_IMAGES, SITE_NAME, TEMPLATE_DIR
 from ..db import get_db
-from ..models import Comment, Post, PostLike, User
+from ..models import Comment, Post, PostLike, PostSummaryUsage, User, cn_now
+from ..services.ai_summary import (
+    AISummaryConfigurationError,
+    AISummaryGenerationError,
+    is_ai_summary_configured,
+    summarize_post,
+)
 
 
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def build_context(request: Request, db: Session, **extra):
@@ -33,6 +41,7 @@ def build_context(request: Request, db: Session, **extra):
         'current_user': get_current_user(request, db),
         'current_admin': get_current_admin(request, db),
         'flash': pop_flash(request),
+        'ai_summary_configured': is_ai_summary_configured(),
     }
     context.update(extra)
     return context
@@ -88,9 +97,16 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
     like_count = db.scalar(select(func.count(PostLike.id)).where(PostLike.post_id == post_id)) or 0
     current_user = get_current_user(request, db)
     liked_by_me = False
+    summary_used_by_me = False
     if current_user:
         liked_by_me = db.scalar(
             select(PostLike.id).where(PostLike.post_id == post_id, PostLike.user_id == current_user.id)
+        ) is not None
+        summary_used_by_me = db.scalar(
+            select(PostSummaryUsage.id).where(
+                PostSummaryUsage.post_id == post_id,
+                PostSummaryUsage.user_id == current_user.id,
+            )
         ) is not None
 
     return templates.TemplateResponse(
@@ -104,7 +120,86 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
             like_count=like_count,
             comment_count=len(comments),
             liked_by_me=liked_by_me,
+            summary_used_by_me=summary_used_by_me,
+            summary_visible=bool(current_user and summary_used_by_me and post.ai_summary),
         ),
+    )
+
+
+@router.post('/posts/{post_id}/ai-summary')
+def generate_ai_summary(post_id: int, request: Request, db: Session = Depends(get_db)):
+    if request.headers.get('x-requested-with') != 'fetch':
+        raise HTTPException(status_code=400, detail='Invalid request')
+
+    post = db.get(Post, post_id)
+    if not post or post.is_deleted:
+        raise HTTPException(status_code=404, detail='Post not found')
+
+    current_user = get_current_user(request, db)
+    if not current_user:
+        logger.info('AI summary rejected for post_id=%s reason=not_logged_in', post_id)
+        return JSONResponse({'ok': False, 'error': '请先登录后再使用 AI 总结。'}, status_code=401)
+
+    used_record = db.scalar(
+        select(PostSummaryUsage).where(
+            PostSummaryUsage.post_id == post_id,
+            PostSummaryUsage.user_id == current_user.id,
+        )
+    )
+    if used_record:
+        logger.info('AI summary rejected for post_id=%s user_id=%s reason=already_used', post_id, current_user.id)
+        return JSONResponse({'ok': False, 'error': '你已经使用过本帖 AI 总结了。'}, status_code=403)
+
+    like_count = db.scalar(select(func.count(PostLike.id)).where(PostLike.post_id == post_id)) or 0
+    comment_texts = db.scalars(
+        select(Comment.content)
+        .where(Comment.post_id == post_id)
+        .order_by(Comment.created_at.desc(), Comment.id.desc())
+        .limit(8)
+    ).all()
+
+    try:
+        if post.ai_summary:
+            logger.info('AI summary cache hit for post_id=%s user_id=%s', post_id, current_user.id)
+            summary = post.ai_summary
+            used_image_count = min(len(post.images), AI_SUMMARY_MAX_IMAGES)
+            generated_now = False
+        else:
+            logger.info('AI summary cache miss for post_id=%s user_id=%s', post_id, current_user.id)
+            summary, used_image_count = summarize_post(
+                post,
+                like_count=like_count,
+                comments=comment_texts,
+            )
+            post.ai_summary = summary
+            post.ai_summary_updated_at = cn_now()
+            generated_now = True
+    except AISummaryConfigurationError as exc:
+        return JSONResponse({'ok': False, 'error': str(exc)}, status_code=503)
+    except AISummaryGenerationError as exc:
+        return JSONResponse({'ok': False, 'error': str(exc)}, status_code=422)
+    except Exception:
+        logger.exception('Failed to generate AI summary for post %s', post_id)
+        return JSONResponse({'ok': False, 'error': 'AI 总结生成失败，请稍后重试。'}, status_code=500)
+
+    db.add(PostSummaryUsage(post_id=post_id, user_id=current_user.id))
+    db.commit()
+    logger.info(
+        'AI summary served for post_id=%s user_id=%s generated_now=%s used_image_count=%s',
+        post_id,
+        current_user.id,
+        generated_now,
+        used_image_count,
+    )
+
+    return JSONResponse(
+        {
+            'ok': True,
+            'summary': summary,
+            'updated_at': post.ai_summary_updated_at.strftime('%Y-%m-%d %H:%M') if post.ai_summary_updated_at else None,
+            'used_image_count': used_image_count,
+            'generated_now': generated_now,
+        }
     )
 
 

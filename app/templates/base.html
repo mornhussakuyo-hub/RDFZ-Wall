@@ -21,7 +21,7 @@
                 {% if current_user %}
                 <span class="nav-user">你好，{{ current_user.username }}</span>
                 <form method="post" action="/logout">
-                    <button class="button ghost small" type="submit">退出</button>
+                    <button class="button ghost small" type="submit">登出</button>
                 </form>
                 {% else %}
                 <a href="/login">登录</a>
@@ -49,5 +49,6 @@
         </div>
     </footer>
 </div>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

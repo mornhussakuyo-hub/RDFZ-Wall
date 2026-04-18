@@ -15,6 +15,8 @@
     </div>
 </div>
 
+<div class="alert success" data-admin-ai-status hidden></div>
+
 {% if posts %}
 <div class="table-card">
     <table class="table">
@@ -26,6 +28,7 @@
                 <th>视频</th>
                 <th>发布时间</th>
                 <th>状态</th>
+                <th>AI总结</th>
                 <th>操作</th>
             </tr>
         </thead>
@@ -45,9 +48,31 @@
                     {% endif %}
                 </td>
                 <td>
-                    <div class="row-actions">
+                    {% if post.ai_summary_generating %}
+                    <span class="badge" data-ai-summary-badge>生成中</span>
+                    <div class="meta" data-ai-summary-time>正在请求大模型...</div>
+                    {% elif post.ai_summary_updated_at %}
+                    <span class="badge ok" data-ai-summary-badge>已生成</span>
+                    <div class="meta" data-ai-summary-time>更新于 {{ post.ai_summary_updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                    {% else %}
+                    <span class="badge muted" data-ai-summary-badge>未生成</span>
+                    <div class="meta" data-ai-summary-time>尚未生成</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="row-actions" data-admin-post-row data-post-id="{{ post.id }}" data-generating="{{ 'true' if post.ai_summary_generating else 'false' }}">
                         <a class="button secondary small" href="/posts/{{ post.id }}" target="_blank">查看</a>
                         {% if not post.is_deleted %}
+                        <form
+                            method="post"
+                            action="/admin/posts/{{ post.id }}/ai-summary/regenerate"
+                            data-admin-ai-form
+                            onsubmit="return confirm('确认强制重新生成这条帖子的 AI 总结？');"
+                        >
+                            <button class="button secondary small" type="submit" data-admin-ai-button {% if post.ai_summary_generating %}disabled{% endif %}>
+                                {% if post.ai_summary_generating %}生成中...{% else %}重生成AI{% endif %}
+                            </button>
+                        </form>
                         <form method="post" action="/admin/posts/{{ post.id }}/delete" onsubmit="return confirm('确认删除这条帖子？');">
                             <button class="button danger small" type="submit">删除</button>
                         </form>
@@ -62,4 +87,7 @@
 {% else %}
 <div class="empty-state">后台还没有任何帖子，先去发第一篇。</div>
 {% endif %}
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/admin_ai_summary.js"></script>
 {% endblock %}

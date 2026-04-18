@@ -140,3 +140,36 @@ wall_mvp/
 ```
 
 ---
+
+## 8. AI 一键总结
+
+帖子详情页现在支持右侧 AI 侧边栏，点击按钮后会综合正文和图片内容生成一段简短解释。
+
+### 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### `.env` 配置
+
+```env
+AI_SUMMARY_API_KEY=你的APIKey
+AI_SUMMARY_BASE_URL=https://api.openai.com/v1
+```
+
+可选项：
+
+```env
+AI_SUMMARY_MODEL=gpt-4.1-mini
+AI_SUMMARY_MAX_IMAGES=3
+AI_SUMMARY_TIMEOUT=45
+```
+
+说明：
+
+- AI 能力基于 LangChain + OpenAI 兼容接口实现
+- 默认会读取帖子标题、正文和最多 3 张图片进行总结
+- 如果你的服务商模型名不是 `gpt-4.1-mini`，再额外设置 `AI_SUMMARY_MODEL`
+
+---
