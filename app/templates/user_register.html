@@ -14,7 +14,7 @@
         <input type="hidden" name="next_url" value="{{ next_url }}">
         <label>
             <span>用户名</span>
-            <input type="text" name="username" minlength="3" maxlength="50" required>
+            <input type="text" name="username" minlength="3" maxlength="20" required>
         </label>
         <label>
             <span>密码</span>
@@ -26,6 +26,6 @@
         </label>
         <button class="button primary" type="submit">注册并登录</button>
     </form>
-    <div class="switch-auth">已经有账号？<a href="/login?next={{ encoded_next_url }}">去登录</a></div>
+    <div class="switch-auth">已经有账号了？<a href="/login?next={{ encoded_next_url }}">去登录</a></div>
 </div>
 {% endblock %}

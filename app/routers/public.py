@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..auth import (
@@ -33,6 +34,45 @@ from ..services.ai_summary import (
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 router = APIRouter()
 logger = logging.getLogger(__name__)
+DEFAULT_SIGNATURE = '这个人很懒，什么也没写(❁´◡`❁)'
+COMMENT_COOLDOWN = timedelta(minutes=1)
+COMMENT_RATE_LIMIT_MESSAGE = '发送评论太频繁啦！歇一下吧！'
+
+
+def normalize_local_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
+
+
+def build_comment_tree(comments: list[Comment]) -> list[dict[str, object]]:
+    nodes = {comment.id: {'comment': comment, 'replies': []} for comment in comments}
+    roots: list[dict[str, object]] = []
+
+    for comment in comments:
+        node = nodes[comment.id]
+        parent_node = nodes.get(comment.parent_id) if comment.parent_id else None
+        if parent_node:
+            parent_node['replies'].append(node)
+        else:
+            roots.append(node)
+
+    return roots
+
+
+def collect_comment_subtree_ids(db: Session, root_comment_id: int) -> list[int]:
+    pending = [root_comment_id]
+    collected: list[int] = []
+
+    while pending:
+        current_id = pending.pop()
+        collected.append(current_id)
+        child_ids = db.scalars(select(Comment.id).where(Comment.parent_id == current_id)).all()
+        pending.extend(child_ids)
+
+    return collected
 
 
 def build_context(request: Request, db: Session, **extra):
@@ -91,9 +131,13 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
     comments = db.scalars(
         select(Comment)
         .where(Comment.post_id == post_id)
-        .options(selectinload(Comment.user))
+        .options(
+            selectinload(Comment.user),
+            selectinload(Comment.parent).selectinload(Comment.user),
+        )
         .order_by(Comment.created_at.asc(), Comment.id.asc())
     ).all()
+    comment_tree = build_comment_tree(comments)
     like_count = db.scalar(select(func.count(PostLike.id)).where(PostLike.post_id == post_id)) or 0
     current_user = get_current_user(request, db)
     liked_by_me = False
@@ -117,11 +161,13 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
             db,
             post=post,
             comments=comments,
+            comment_tree=comment_tree,
             like_count=like_count,
             comment_count=len(comments),
             liked_by_me=liked_by_me,
             summary_used_by_me=summary_used_by_me,
             summary_visible=bool(current_user and summary_used_by_me and post.ai_summary),
+            comment_rate_limit_message=COMMENT_RATE_LIMIT_MESSAGE,
         ),
     )
 
@@ -266,6 +312,13 @@ def register_submit(
             build_context(request, db, error='用户名至少 3 个字符。', next_url=next_url or '/', encoded_next_url=quote(next_url or '/', safe='')), 
             status_code=400,
         )
+    if len(clean_username) > 20:
+        return templates.TemplateResponse(
+            request,
+            'user_register.html',
+            build_context(request, db, error='昵称不能超过 20 个字。', next_url=next_url or '/', encoded_next_url=quote(next_url or '/', safe='')),
+            status_code=400,
+        )
     if len(password) < 6:
         return templates.TemplateResponse(
             request,
@@ -304,6 +357,105 @@ def user_logout(request: Request):
     return RedirectResponse(url='/', status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.get('/me', response_class=HTMLResponse)
+def user_profile_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return redirect_login('/me')
+
+    comment_count = db.scalar(select(func.count(Comment.id)).where(Comment.user_id == user.id)) or 0
+
+    return templates.TemplateResponse(
+        request,
+        'user_profile.html',
+        build_context(
+            request,
+            db,
+            profile_user=user,
+            profile_comment_count=comment_count,
+            profile_signature_value=user.signature or '',
+            profile_signature_text=user.signature or DEFAULT_SIGNATURE,
+            error=None,
+        ),
+    )
+
+
+@router.post('/me', response_class=HTMLResponse)
+def user_profile_update(
+    request: Request,
+    username: str = Form(...),
+    signature: str = Form(''),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return redirect_login('/me')
+
+    comment_count = db.scalar(select(func.count(Comment.id)).where(Comment.user_id == user.id)) or 0
+    clean_username = username.strip()
+    clean_signature = signature.strip()
+    if len(clean_username) < 3:
+        return templates.TemplateResponse(
+            request,
+            'user_profile.html',
+            build_context(request, db, profile_user=user, profile_comment_count=comment_count, error='昵称至少需要 3 个字符。'),
+            status_code=400,
+        )
+    if len(clean_username) > 20:
+        return templates.TemplateResponse(
+            request,
+            'user_profile.html',
+            build_context(request, db, profile_user=user, profile_comment_count=comment_count, error='昵称不能超过 50 个字符。'),
+            status_code=400,
+        )
+
+    if len(clean_signature) > 40:
+        set_flash(request, 'error', '个性签名不能超过 40 个字。')
+        return RedirectResponse(url='/me', status_code=status.HTTP_303_SEE_OTHER)
+
+    existing = db.scalar(select(User).where(User.username == clean_username, User.id != user.id))
+    if existing:
+        return templates.TemplateResponse(
+            request,
+            'user_profile.html',
+            build_context(request, db, profile_user=user, profile_comment_count=comment_count, error='这个昵称已经被别人使用了。'),
+            status_code=400,
+        )
+
+    user.username = clean_username
+    user.signature = clean_signature or None
+    db.commit()
+    db.refresh(user)
+    login_user(request, user)
+    set_flash(request, 'success', '个人信息已更新。')
+    return RedirectResponse(url='/me', status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get('/users/{public_uuid}', response_class=HTMLResponse)
+def public_profile_page(public_uuid: str, request: Request, db: Session = Depends(get_db)):
+    profile_user = db.scalar(select(User).where(User.public_uuid == public_uuid))
+    if not profile_user:
+        raise HTTPException(status_code=404, detail='User not found')
+
+    current_user = get_current_user(request, db)
+    if current_user and current_user.id == profile_user.id:
+        return RedirectResponse(url='/me', status_code=status.HTTP_303_SEE_OTHER)
+
+    comment_count = db.scalar(select(func.count(Comment.id)).where(Comment.user_id == profile_user.id)) or 0
+
+    return templates.TemplateResponse(
+        request,
+        'public_profile.html',
+        build_context(
+            request,
+            db,
+            profile_user=profile_user,
+            profile_comment_count=comment_count,
+            profile_signature_text=profile_user.signature or DEFAULT_SIGNATURE,
+        ),
+    )
+
+
 @router.post('/posts/{post_id}/like')
 def toggle_like(post_id: int, request: Request, db: Session = Depends(get_db)):
     post = db.get(Post, post_id)
@@ -330,6 +482,7 @@ def create_comment(
     post_id: int,
     request: Request,
     content: str = Form(...),
+    parent_id: str = Form(''),
     db: Session = Depends(get_db),
 ):
     post = db.get(Post, post_id)
@@ -348,8 +501,58 @@ def create_comment(
         set_flash(request, 'error', '评论不能超过 1000 个字符。')
         return RedirectResponse(url=f'/posts/{post_id}#comments', status_code=status.HTTP_303_SEE_OTHER)
 
-    comment = Comment(post_id=post_id, user_id=user.id, content=clean_content)
+    reply_parent: Comment | None = None
+    clean_parent_id = parent_id.strip()
+    if clean_parent_id:
+        if not clean_parent_id.isdigit():
+            set_flash(request, 'error', '回复目标不存在。')
+            return RedirectResponse(url=f'/posts/{post_id}#comments', status_code=status.HTTP_303_SEE_OTHER)
+        reply_parent = db.get(Comment, int(clean_parent_id))
+        if not reply_parent or reply_parent.post_id != post_id:
+            set_flash(request, 'error', '回复目标不存在。')
+            return RedirectResponse(url=f'/posts/{post_id}#comments', status_code=status.HTTP_303_SEE_OTHER)
+
+    now = normalize_local_datetime(cn_now())
+    next_comment_at = normalize_local_datetime(user.next_comment_at)
+    if now and next_comment_at and now < next_comment_at:
+        set_flash(request, 'error', COMMENT_RATE_LIMIT_MESSAGE)
+        return RedirectResponse(url=f'/posts/{post_id}#comments', status_code=status.HTTP_303_SEE_OTHER)
+
+    comment = Comment(
+        post_id=post_id,
+        user_id=user.id,
+        parent_id=reply_parent.id if reply_parent else None,
+        content=clean_content,
+    )
     db.add(comment)
+    if now:
+        user.next_comment_at = now + COMMENT_COOLDOWN
     db.commit()
     set_flash(request, 'success', '评论已发布。')
+    return RedirectResponse(url=f'/posts/{post_id}#comment-{comment.id}', status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post('/posts/{post_id}/comments/{comment_id}/delete')
+def delete_comment(
+    post_id: int,
+    comment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    admin = get_current_admin(request, db)
+    if not admin:
+        return RedirectResponse(url='/admin/login', status_code=status.HTTP_303_SEE_OTHER)
+
+    post = db.get(Post, post_id)
+    if not post or post.is_deleted:
+        raise HTTPException(status_code=404, detail='Post not found')
+
+    comment = db.get(Comment, comment_id)
+    if not comment or comment.post_id != post_id:
+        raise HTTPException(status_code=404, detail='Comment not found')
+
+    delete_ids = collect_comment_subtree_ids(db, comment.id)
+    db.execute(delete(Comment).where(Comment.id.in_(delete_ids)))
+    db.commit()
+    set_flash(request, 'success', '评论已删除。')
     return RedirectResponse(url=f'/posts/{post_id}#comments', status_code=status.HTTP_303_SEE_OTHER)

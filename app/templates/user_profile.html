@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}个人信息 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="form-card narrow profile-card">
+    <div class="profile-hero">
+        <div class="profile-avatar">{{ profile_user.username[:1] }}</div>
+        <div>
+            <span class="eyebrow">My Profile</span>
+            <h1>个人信息</h1>
+            <p class="meta">{{ profile_signature_text }}</p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    <div class="profile-summary">
+        <div class="profile-summary__row">
+            <span class="meta">当前头像</span>
+            <strong>昵称首字头像</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">昵称</span>
+            <strong>{{ profile_user.username }}</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">用户 ID</span>
+            <strong>{{ profile_user.public_uuid }}</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">评论数</span>
+            <strong>{{ profile_comment_count }}</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">注册时间</span>
+            <strong>{{ profile_user.created_at.strftime('%Y-%m-%d %H:%M') }}</strong>
+        </div>
+    </div>
+
+    <form method="post" class="form-grid">
+        <label>
+            <span>昵称</span>
+            <input type="text" name="username" minlength="3" maxlength="20" value="{{ profile_user.username }}" required>
+        </label>
+        <label>
+            <span>个性签名</span>
+            <textarea name="signature" rows="3" maxlength="40" placeholder="更新个性签名（最多40字）"></textarea>
+        </label>
+        <button class="button primary" type="submit">保存修改</button>
+    </form>
+</div>
+{% endblock %}

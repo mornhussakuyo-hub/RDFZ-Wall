@@ -6,7 +6,7 @@
         <div class="detail-header">
             <div>
                 <div class="meta">发布时间：{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</div>
-                <h1>{{ post.title or ('无标题 #' ~ post.id) }}</h1>
+                <h1>{{ post.title or ('无标题帖子 #' ~ post.id) }}</h1>
             </div>
             <div class="detail-stats">
                 <span class="chip large">👍 {{ like_count }}</span>
@@ -25,7 +25,7 @@
                 {% for video in post.videos %}
                 <video class="post-video" controls preload="metadata">
                     <source src="{{ video }}">
-                    你的浏览器不支持视频播放。
+                    你的浏览器暂不支持视频播放。
                 </video>
                 {% endfor %}
             </div>
@@ -59,19 +59,39 @@
             </div>
         </section>
 
-        <section id="comments" class="comments-section">
-            <div class="section-head">
-                <div>
-                    <h2>评论区</h2>
-                    <p class="meta">共 {{ comment_count }} 条评论</p>
+        <section
+            id="comments"
+            class="comments-section comments-panel"
+            data-comment-panel
+            data-rate-limited="{{ 'true' if flash and flash.level == 'error' and flash.message == comment_rate_limit_message else 'false' }}"
+            data-rate-limit-message="{{ comment_rate_limit_message }}"
+        >
+            <div class="comments-toolbar">
+                <div class="comments-title-row">
+                    <h2>评论 <span>{{ comment_count }}</span></h2>
+                    <div class="comments-tabs" aria-hidden="true">
+                        <span class="is-active">最新</span>
+                        <span>回复</span>
+                    </div>
                 </div>
             </div>
 
             {% if current_user %}
-            <form method="post" action="/posts/{{ post.id }}/comments" class="comment-form">
-                <textarea name="content" rows="4" maxlength="1000" placeholder="说点什么吧……"></textarea>
-                <div class="submit-row">
-                    <button class="button primary" type="submit">发布评论</button>
+            <form method="post" action="/posts/{{ post.id }}/comments" class="comment-compose" data-root-comment-form>
+                <div class="comment-avatar comment-avatar--me">{{ current_user.username[:1] }}</div>
+                <div class="comment-compose__body">
+                    <textarea
+                        name="content"
+                        rows="3"
+                        maxlength="1000"
+                        class="comment-compose__input"
+                        data-root-comment-textarea
+                        placeholder="下面我简单喵两句"
+                    ></textarea>
+                    <div class="comment-compose__actions">
+                        <span class="comment-compose__tip">文明发言，友善交流。</span>
+                        <button class="button primary comment-compose__submit" type="submit">发布评论</button>
+                    </div>
                 </div>
             </form>
             {% else %}
@@ -84,15 +104,90 @@
             </div>
             {% endif %}
 
-            {% if comments %}
-            <div class="comment-list">
-                {% for comment in comments %}
-                <article class="comment-item">
-                    <div class="comment-head">
-                        <strong>{{ comment.user.username }}</strong>
-                        <span class="meta">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            {% if comment_tree %}
+            <div class="comment-thread-list">
+                {% for node in comment_tree recursive %}
+                {% set comment = node.comment %}
+                {% set is_self_profile = current_user and current_user.id == comment.user.id %}
+                {% set comment_profile_url = '/me' if is_self_profile else '/users/' ~ comment.user.public_uuid %}
+                <article
+                    id="comment-{{ comment.id }}"
+                    class="comment-thread{% if loop.depth0 > 0 %} is-nested{% endif %}"
+                >
+                    <div class="comment-thread__avatar">
+                        <a href="{{ comment_profile_url }}" class="comment-avatar-link">
+                            <span class="comment-avatar">{{ comment.user.username[:1] }}</span>
+                        </a>
                     </div>
-                    <div class="comment-body">{{ comment.content | e | replace('\n', '<br>') | safe }}</div>
+                    <div class="comment-thread__main">
+                        <div class="comment-thread__head">
+                            <div class="comment-thread__author">
+                                <a href="{{ comment_profile_url }}" class="comment-user-link">
+                                    <strong>{{ comment.user.username }}</strong>
+                                </a>
+                                {% if comment.parent %}
+                                <span class="comment-reply-mark">回复 @{{ comment.parent.user.username }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="comment-thread__content">{{ comment.content | e | replace('\n', '<br>') | safe }}</div>
+                        <div class="comment-thread__meta">
+                            <span class="meta">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            {% if current_user %}
+                            <button
+                                class="comment-inline-action"
+                                type="button"
+                                data-reply-trigger
+                                data-comment-id="{{ comment.id }}"
+                                data-comment-username="{{ comment.user.username }}"
+                            >
+                                回复
+                            </button>
+                            {% endif %}
+                            {% if current_admin %}
+                            <form
+                                method="post"
+                                action="/posts/{{ post.id }}/comments/{{ comment.id }}/delete"
+                                class="comment-inline-form"
+                                onsubmit="return confirm('确认删除这条评论吗？');"
+                            >
+                                <button class="comment-inline-action danger" type="submit">删除评论</button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+                        {% if current_user %}
+                        <form
+                            method="post"
+                            action="/posts/{{ post.id }}/comments"
+                            class="inline-reply-form"
+                            data-reply-form
+                            data-comment-id="{{ comment.id }}"
+                            hidden
+                        >
+                            <input type="hidden" name="parent_id" value="{{ comment.id }}">
+                            <div class="inline-reply-form__hint" data-reply-hint>回复 @{{ comment.user.username }}：</div>
+                            <textarea
+                                name="content"
+                                rows="3"
+                                maxlength="1000"
+                                class="inline-reply-form__input"
+                                data-reply-textarea
+                                placeholder="回复 @{{ comment.user.username }}：我也说两句"
+                            ></textarea>
+                            <div class="inline-reply-form__actions">
+                                <button class="button ghost small" type="button" data-reply-cancel>取消</button>
+                                <button class="button primary small" type="submit">发布</button>
+                            </div>
+                        </form>
+                        {% endif %}
+
+                        {% if node.replies %}
+                        <div class="comment-thread__children">
+                            {{ loop(node.replies) }}
+                        </div>
+                        {% endif %}
+                    </div>
                 </article>
                 {% endfor %}
             </div>
@@ -123,7 +218,7 @@
         <div class="ai-summary-header">
             <div>
                 <h2>AI 一键解读</h2>
-                <p class="meta">为什么不问问神奇海螺呢？</p>
+                <p class="meta">快速获取这条内容的关键信息。</p>
             </div>
         </div>
         <button
@@ -137,9 +232,9 @@
             {% elif summary_used_by_me %}
             已使用过
             {% elif post.ai_summary %}
-            查看 AI 解释
+            查看 AI 解读
             {% else %}
-            生成 AI 解释
+            生成 AI 解读
             {% endif %}
         </button>
         <div
@@ -148,11 +243,11 @@
             {% if ai_summary_configured and current_user and not summary_used_by_me %}hidden{% endif %}
         >
             {% if not ai_summary_configured %}
-            请先在 .env 中配置 AI_SUMMARY_API_KEY 和 AI_SUMMARY_BASE_URL。
+            请先在 `.env` 中配置 `AI_SUMMARY_API_KEY` 和 `AI_SUMMARY_BASE_URL`。
             {% elif not current_user %}
             请先登录后再使用 AI 总结功能。
             {% else %}
-            你已经使用过本帖 AI 总结了。
+            你已经使用过这条帖子的 AI 总结了。
             {% endif %}
         </div>
         {% if not current_user %}
@@ -164,13 +259,13 @@
         <div class="ai-summary-box">
             <div class="ai-summary-placeholder" data-ai-summary-placeholder {% if summary_visible %}hidden{% endif %}>
                 {% if not current_user %}
-                登录后可使用 AI 总结；每个账号在本帖只有 1 次使用机会。
+                登录后可使用 AI 总结；每个账号在本帖仅有 1 次使用机会。
                 {% elif summary_used_by_me and not post.ai_summary %}
-                你已使用过本帖 AI 总结，但当前没有可展示的总结内容。
+                你已经使用过本帖 AI 总结，但当前没有可展示的总结内容。
                 {% elif post.ai_summary %}
                 本帖已有缓存总结，点击按钮即可消耗一次使用资格并查看。
                 {% else %}
-                点击按钮后，AI 会抓取本帖正文与图片内容，生成一段简短总结。
+                点击按钮后，AI 会结合帖子正文、图片和评论摘录生成一段简短总结。
                 {% endif %}
             </div>
             <div class="ai-summary-content" data-ai-summary-content {% if not summary_visible %}hidden{% endif %}>
@@ -183,11 +278,11 @@
             {% elif summary_used_by_me %}
             你已使用过本帖 AI 总结
             {% elif post.ai_summary_updated_at %}
-            当前有缓存总结，最近生成：{{ post.ai_summary_updated_at.strftime('%Y-%m-%d %H:%M') }}
+            当前已有缓存总结，最近生成：{{ post.ai_summary_updated_at.strftime('%Y-%m-%d %H:%M') }}
             {% elif post.images %}
             你还有 1 次使用机会；当前可分析 {{ post.images|length }} 张图片
             {% else %}
-            你还有 1 次使用机会；当前将以帖子文本内容为主
+            你还有 1 次使用机会；当前将以帖子文字内容为主
             {% endif %}
         </div>
     </aside>
@@ -195,4 +290,5 @@
 {% endblock %}
 {% block extra_scripts %}
 <script src="/static/js/post_ai_summary.js"></script>
+<script src="/static/js/comment_interactions.js"></script>
 {% endblock %}

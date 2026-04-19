@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -16,6 +17,10 @@ def cn_now():
         return datetime.now(ZoneInfo("Asia/Shanghai"))
     except ZoneInfoNotFoundError:
         return datetime.now(timezone(timedelta(hours=8)))
+
+
+def generate_public_uuid() -> str:
+    return str(uuid.uuid4())
 
 
 class JsonListFieldMixin:
@@ -43,9 +48,12 @@ class User(Base):
     __tablename__ = 'users'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    public_uuid: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=generate_public_uuid)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    signature: Mapped[str | None] = mapped_column(String(40), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now)
+    next_comment_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     comments: Mapped[list['Comment']] = relationship(back_populates='user', cascade='all, delete-orphan')
     likes: Mapped[list['PostLike']] = relationship(back_populates='user', cascade='all, delete-orphan')
@@ -106,11 +114,24 @@ class Comment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     post_id: Mapped[int] = mapped_column(ForeignKey('posts.id', ondelete='CASCADE'), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey('comments.id', ondelete='CASCADE'), nullable=True, index=True)
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=cn_now, index=True)
 
     post: Mapped['Post'] = relationship(back_populates='comments')
     user: Mapped['User'] = relationship(back_populates='comments')
+    parent: Mapped['Comment | None'] = relationship(
+        'Comment',
+        back_populates='replies',
+        remote_side='Comment.id',
+        foreign_keys=[parent_id],
+    )
+    replies: Mapped[list['Comment']] = relationship(
+        'Comment',
+        back_populates='parent',
+        cascade='all, delete-orphan',
+        foreign_keys=[parent_id],
+    )
 
 
 class PostLike(Base):

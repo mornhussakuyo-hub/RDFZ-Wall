@@ -13,15 +13,15 @@
     <header class="site-header">
         <div class="container header-inner">
             <a href="/" class="brand">
-                <span class="brand-mark">✦</span>
+                <span class="brand-mark">W</span>
                 <span>{{ site_name }}</span>
             </a>
             <nav class="main-nav">
                 <a href="/">首页</a>
                 {% if current_user %}
-                <span class="nav-user">你好，{{ current_user.username }}</span>
+                <a href="/me" class="nav-user">你好，{{ current_user.username }}</a>
                 <form method="post" action="/logout">
-                    <button class="button ghost small" type="submit">登出</button>
+                    <button class="button ghost small" type="submit">退出</button>
                 </form>
                 {% else %}
                 <a href="/login">登录</a>
@@ -43,9 +43,14 @@
         <div class="container footer-inner">
             <div>
                 <strong>{{ site_name }}</strong>
-                <div class="footer-copy">由 MornHus 开发。</div>
+                <div class="footer-copy">由 MornHus 开发</div>
             </div>
-            <div class="footer-copy">Built with FastAPI · Campus Wall</div>
+            <div>
+                <div class="footer-copy">Built with FastAPI · Campus Wall</div>
+                <div class="footer-copy">
+                    <a href="https://www.cnblogs.com/mornhus-xsylf-123/p/19891705" target="_blank" rel="noopener noreferrer">开发日志</a>
+                </div>
+            </div>
         </div>
     </footer>
 </div>

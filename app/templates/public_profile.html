@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}{{ profile_user.username }} 的主页 - {{ site_name }}{% endblock %}
+{% block content %}
+<div class="form-card narrow profile-card">
+    <div class="profile-hero">
+        <div class="profile-avatar">{{ profile_user.username[:1] }}</div>
+        <div>
+            <span class="eyebrow">Public Profile</span>
+            <h1>{{ profile_user.username }} 的主页</h1>
+            <p class="meta">{{ profile_signature_text }}</p>
+        </div>
+    </div>
+
+    <div class="profile-summary">
+        <div class="profile-summary__row">
+            <span class="meta">头像</span>
+            <strong>昵称首字头像</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">昵称</span>
+            <strong>{{ profile_user.username }}</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">用户 ID</span>
+            <strong>{{ profile_user.public_uuid }}</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">评论数</span>
+            <strong>{{ profile_comment_count }}</strong>
+        </div>
+        <div class="profile-summary__row">
+            <span class="meta">加入时间</span>
+            <strong>{{ profile_user.created_at.strftime('%Y-%m-%d %H:%M') }}</strong>
+        </div>
+    </div>
+</div>
+{% endblock %}
