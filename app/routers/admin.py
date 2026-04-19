@@ -29,6 +29,7 @@ from ..config import (
     MAX_UPLOAD_FILES,
     MAX_VIDEO_FILES,
     SITE_NAME,
+    STATIC_VERSION,
     TEMPLATE_DIR,
     UPLOAD_DIR,
 )
@@ -59,6 +60,7 @@ def build_context(request: Request, db: Session, **extra):
         'current_user': get_current_user(request, db),
         'current_admin': get_current_admin(request, db),
         'flash': pop_flash(request),
+        'static_version': STATIC_VERSION,
     }
     context.update(extra)
     return context

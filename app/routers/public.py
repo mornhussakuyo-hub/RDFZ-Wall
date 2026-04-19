@@ -20,7 +20,7 @@ from ..auth import (
     set_flash,
     verify_password,
 )
-from ..config import AI_SUMMARY_MAX_IMAGES, SITE_NAME, TEMPLATE_DIR
+from ..config import AI_SUMMARY_MAX_IMAGES, SITE_NAME, STATIC_VERSION, TEMPLATE_DIR
 from ..db import get_db
 from ..models import Comment, Post, PostLike, PostSummaryUsage, User, cn_now
 from ..services.ai_summary import (
@@ -82,6 +82,7 @@ def build_context(request: Request, db: Session, **extra):
         'current_admin': get_current_admin(request, db),
         'flash': pop_flash(request),
         'ai_summary_configured': is_ai_summary_configured(),
+        'static_version': STATIC_VERSION,
     }
     context.update(extra)
     return context

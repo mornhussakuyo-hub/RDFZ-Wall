@@ -25,6 +25,14 @@ ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.m4v'}
 SITE_NAME = os.getenv('SITE_NAME', '人亚校园墙')
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+STATIC_VERSION = str(
+    int(
+        max(
+            (path.stat().st_mtime for path in STATIC_DIR.rglob('*') if path.is_file()),
+            default=0,
+        )
+    )
+)
 AI_SUMMARY_API_KEY = os.getenv('AI_SUMMARY_API_KEY', '').strip()
 AI_SUMMARY_BASE_URL = os.getenv('AI_SUMMARY_BASE_URL', 'https://api.openai.com/v1').strip().rstrip('/')
 AI_SUMMARY_MODEL = os.getenv('AI_SUMMARY_MODEL', 'gpt-4.1-mini').strip()
