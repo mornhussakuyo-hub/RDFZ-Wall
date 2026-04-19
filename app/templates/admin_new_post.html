@@ -16,36 +16,51 @@
     {% if error %}
     <div class="alert error">{{ error }}</div>
     {% endif %}
-    <form method="post" enctype="multipart/form-data" class="form-grid">
+    <form
+        method="post"
+        enctype="multipart/form-data"
+        class="form-grid"
+        data-upload-form
+        data-max-upload-files="{{ max_upload_files }}"
+        data-max-single-file-mb="{{ max_single_file_mb }}"
+        data-max-video-files="{{ max_video_files }}"
+        data-max-single-video-mb="{{ max_single_video_mb }}"
+        data-max-request-body-mb="{{ max_request_body_mb }}"
+    >
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <label>
             <span>标题（可空）</span>
-            <input type="text" name="title" maxlength="200" value="{{ title_value }}" placeholder="比如：今天的投稿 #12">
+            <input type="text" name="title" maxlength="200" value="{{ title_value }}" placeholder="比如：今天的投票 #12">
         </label>
 
         <label>
             <span>正文（可空）</span>
-            <textarea name="content" rows="8" placeholder="可以贴文字，也可以只发截图或视频。">{{ content_value }}</textarea>
+            <textarea name="content" rows="8" placeholder="可以发文字，也可以只发截图或视频。">{{ content_value }}</textarea>
         </label>
 
         <div class="two-col-form">
             <label>
                 <span>上传截图 / 图片（可多选）</span>
-                <input type="file" name="images" accept="image/*" multiple>
-                <small class="hint">支持 jpg / jpeg / png / webp / gif，最多 9 张。</small>
+                <input type="file" name="images" accept="image/*" multiple data-upload-images>
+                <small class="hint">支持 jpg / jpeg / png / webp / gif，最多 {{ max_upload_files }} 张，单张不超过 {{ max_single_file_mb }}MB。</small>
             </label>
 
             <label>
                 <span>上传视频（可多选）</span>
-                <input type="file" name="videos" accept="video/mp4,video/webm,video/quicktime,.m4v" multiple>
-                <small class="hint">支持 mp4 / webm / mov / m4v，最多 3 个。</small>
+                <input type="file" name="videos" accept="video/mp4,video/webm,video/quicktime,.m4v" multiple data-upload-videos>
+                <small class="hint">支持 mp4 / webm / mov / m4v，最多 {{ max_video_files }} 个，单个不超过 {{ max_single_video_mb }}MB。</small>
             </label>
         </div>
+
+        <div class="meta">提交前会检查本次上传总大小，建议不要超过 {{ max_request_body_mb }}MB。</div>
 
         <div class="submit-row">
             <button class="button primary" type="submit">直接发布</button>
         </div>
     </form>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/admin_upload_guard.js?v={{ static_version }}"></script>
 {% endblock %}

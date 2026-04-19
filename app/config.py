@@ -21,6 +21,7 @@ MAX_UPLOAD_FILES = int(os.getenv('MAX_UPLOAD_FILES', '9'))
 MAX_SINGLE_FILE_MB = int(os.getenv('MAX_SINGLE_FILE_MB', '10'))
 MAX_VIDEO_FILES = int(os.getenv('MAX_VIDEO_FILES', '3'))
 MAX_SINGLE_VIDEO_MB = int(os.getenv('MAX_SINGLE_VIDEO_MB', '100'))
+MAX_REQUEST_BODY_MB = int(os.getenv('MAX_REQUEST_BODY_MB', '128'))
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.m4v'}
 SITE_NAME = os.getenv('SITE_NAME', '人亚校园墙')

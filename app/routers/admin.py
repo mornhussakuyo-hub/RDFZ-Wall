@@ -24,6 +24,7 @@ from ..auth import (
 from ..config import (
     ALLOWED_IMAGE_EXTENSIONS,
     ALLOWED_VIDEO_EXTENSIONS,
+    MAX_REQUEST_BODY_MB,
     MAX_SINGLE_FILE_MB,
     MAX_SINGLE_VIDEO_MB,
     MAX_UPLOAD_FILES,
@@ -61,6 +62,11 @@ def build_context(request: Request, db: Session, **extra):
         'current_admin': get_current_admin(request, db),
         'flash': pop_flash(request),
         'static_version': STATIC_VERSION,
+        'max_upload_files': MAX_UPLOAD_FILES,
+        'max_single_file_mb': MAX_SINGLE_FILE_MB,
+        'max_video_files': MAX_VIDEO_FILES,
+        'max_single_video_mb': MAX_SINGLE_VIDEO_MB,
+        'max_request_body_mb': MAX_REQUEST_BODY_MB,
     }
     context.update(extra)
     return context
