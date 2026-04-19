@@ -1,41 +1,49 @@
 {% extends 'base.html' %}
 {% block title %}{{ site_name }}{% endblock %}
 {% block content %}
-<section class="hero hero-large">
-    <div class="hero-text">
-        <span class="eyebrow">校园分享 · 实时互动</span>
-        <h1>{{ site_name }}</h1>
-        <p>崇德，博学，创新，求实。</p>
-        <div class="hero-actions">
-            {% if current_user %}
-            <a class="button primary" href="#feed">去看帖子</a>
-            {% else %}
-            <a class="button primary" href="/register">注册账号</a>
-            <a class="button secondary" href="/login">登录参与互动</a>
-            {% endif %}
+<section class="home-hero-layout">
+    <aside class="hero-visual-card" aria-hidden="true">
+        <div class="hero-visual-stage">
+            <img src="/static/wall.png?v={{ static_version }}" alt="校园墙插画" class="hero-visual-image">
         </div>
-    </div>
-    <div class="hero-panel">
-        <div class="stat-card">
-            <strong>{{ posts|length }}</strong>
-            <span>已发布帖子</span>
+    </aside>
+
+    <section class="hero hero-large hero-card-main">
+        <div class="hero-text">
+            <span class="eyebrow">校园分享 · 实时互动</span>
+            <h1>{{ site_name }}</h1>
+            <p>崇德，博学，创新，求实。</p>
+            <div class="hero-actions">
+                {% if current_user %}
+                <a class="button primary" href="#feed">去看帖子</a>
+                {% else %}
+                <a class="button primary" href="/register">注册账号</a>
+                <a class="button secondary" href="/login">登录参与互动</a>
+                {% endif %}
+            </div>
         </div>
-        <div class="stat-card">
-            <strong>{{ total_like_count }}</strong>
-            <span>累计点赞</span>
+        <div class="hero-panel">
+            <div class="stat-card">
+                <strong>{{ posts|length }}</strong>
+                <span>已发布帖子</span>
+            </div>
+            <div class="stat-card">
+                <strong>{{ total_like_count }}</strong>
+                <span>累计点赞</span>
+            </div>
+            <div class="stat-card">
+                <strong>{{ total_comment_count }}</strong>
+                <span>累计评论</span>
+            </div>
         </div>
-        <div class="stat-card">
-            <strong>{{ total_comment_count }}</strong>
-            <span>累计评论</span>
-        </div>
-    </div>
+    </section>
 </section>
 
 {% if posts %}
 <section id="feed" class="section-head">
     <div>
         <h2>最新帖子</h2>
-        <p class="meta">封面、标题、摘要、互动数据都在首页直接可见。</p>
+        <p class="meta">从这里开始！</p>
     </div>
 </section>
 <div class="post-grid">
@@ -46,7 +54,7 @@
             <img src="{{ post.cover }}" alt="帖子封面">
             {% elif post.videos %}
             <div class="cover-placeholder video-placeholder">
-                <span>🎬</span>
+                <span>🎞</span>
                 <span>视频帖子</span>
             </div>
             {% else %}
