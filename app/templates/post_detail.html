@@ -5,7 +5,10 @@
     <article class="detail-card">
         <div class="detail-header">
             <div>
-                <div class="meta">发布时间：{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                <div class="meta">
+                    {% if post.is_pinned %}<span class="pin-indicator" title="置顶帖" aria-label="置顶帖">📌 置顶</span>{% endif %}
+                    发布时间：{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}
+                </div>
                 <h1>{{ post.title or ('无标题帖子 #' ~ post.id) }}</h1>
             </div>
             <div class="detail-stats">
@@ -15,7 +18,7 @@
         </div>
 
         {% if post.content %}
-        <div class="detail-content">{{ post.content | e | replace('\n', '<br>') | safe }}</div>
+        <div class="detail-content markdown-content">{{ post_content_html }}</div>
         {% endif %}
 
         {% if post.videos %}
@@ -133,6 +136,21 @@
                         <div class="comment-thread__content">{{ comment.content | e | replace('\n', '<br>') | safe }}</div>
                         <div class="comment-thread__meta">
                             <span class="meta">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="comment-like-count">👍 {{ comment_like_counts.get(comment.id, 0) }}</span>
+                            {% if current_user %}
+                            <form
+                                method="post"
+                                action="/posts/{{ post.id }}/comments/{{ comment.id }}/like"
+                                class="comment-inline-form"
+                            >
+                                <button
+                                    class="comment-inline-action{% if comment.id in liked_comment_ids %} is-active{% endif %}"
+                                    type="submit"
+                                >
+                                    {% if comment.id in liked_comment_ids %}取消赞{% else %}点赞{% endif %}
+                                </button>
+                            </form>
+                            {% endif %}
                             {% if current_user %}
                             <button
                                 class="comment-inline-action"
@@ -291,4 +309,5 @@
 {% block extra_scripts %}
 <script src="/static/js/post_ai_summary.js?v={{ static_version }}"></script>
 <script src="/static/js/comment_interactions.js?v={{ static_version }}"></script>
+<script src="/static/js/code_copy.js?v={{ static_version }}"></script>
 {% endblock %}

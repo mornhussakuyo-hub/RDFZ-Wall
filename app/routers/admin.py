@@ -184,7 +184,9 @@ def admin_posts(request: Request, db: Session = Depends(get_db)):
     if not admin:
         return redirect_to_login()
 
-    posts = db.scalars(select(Post).order_by(Post.published_at.desc(), Post.id.desc())).all()
+    posts = db.scalars(
+        select(Post).order_by(Post.is_pinned.desc(), Post.published_at.desc(), Post.id.desc())
+    ).all()
     return templates.TemplateResponse(
         request,
         'admin_posts.html',
@@ -331,6 +333,41 @@ def delete_post(post_id: int, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail='Post not found')
     post.is_deleted = True
     db.commit()
+    set_flash(request, 'success', f'帖子 #{post.id} 已删除。')
+    return RedirectResponse(url='/admin/posts', status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post('/posts/{post_id}/restore')
+def restore_post(post_id: int, request: Request, db: Session = Depends(get_db)):
+    admin = get_current_admin(request, db)
+    if not admin:
+        return redirect_to_login()
+
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail='Post not found')
+    post.is_deleted = False
+    db.commit()
+    set_flash(request, 'success', f'帖子 #{post.id} 已恢复。')
+    return RedirectResponse(url='/admin/posts', status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post('/posts/{post_id}/pin')
+def toggle_pin_post(post_id: int, request: Request, db: Session = Depends(get_db)):
+    admin = get_current_admin(request, db)
+    if not admin:
+        return redirect_to_login()
+
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail='Post not found')
+    if post.is_deleted:
+        set_flash(request, 'error', '请先恢复帖子，再进行置顶操作。')
+        return RedirectResponse(url='/admin/posts', status_code=status.HTTP_303_SEE_OTHER)
+
+    post.is_pinned = not post.is_pinned
+    db.commit()
+    set_flash(request, 'success', f'帖子 #{post.id} 已{"置顶" if post.is_pinned else "取消置顶"}。')
     return RedirectResponse(url='/admin/posts', status_code=status.HTTP_303_SEE_OTHER)
 
 

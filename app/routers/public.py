@@ -22,7 +22,9 @@ from ..auth import (
 )
 from ..config import AI_SUMMARY_MAX_IMAGES, SITE_NAME, STATIC_VERSION, TEMPLATE_DIR
 from ..db import get_db
-from ..models import Comment, Post, PostLike, PostSummaryUsage, User, cn_now
+from ..models import Comment, CommentLike, Notification, Post, PostLike, PostSummaryUsage, User, cn_now
+from ..services.markdown_utils import build_markdown_excerpt, render_markdown
+from ..services.notifications import notify_comment_liked, notify_comment_reply, remove_comment_like_notification
 from ..services.ai_summary import (
     AISummaryConfigurationError,
     AISummaryGenerationError,
@@ -92,10 +94,60 @@ def redirect_login(next_url: str = '/') -> RedirectResponse:
     return RedirectResponse(url=f'/login?next={quote(next_url, safe="/%?:=&")}', status_code=status.HTTP_303_SEE_OTHER)
 
 
+def load_user_notification_context(
+    db: Session,
+    user: User,
+    *,
+    unread_limit: int = 20,
+    archived_limit: int = 30,
+) -> dict[str, object]:
+    unread_notifications = db.scalars(
+        select(Notification)
+        .where(
+            Notification.recipient_user_id == user.id,
+            Notification.is_read.is_(False),
+        )
+        .options(selectinload(Notification.actor))
+        .order_by(Notification.created_at.desc(), Notification.id.desc())
+        .limit(unread_limit)
+    ).all()
+    archived_notifications = db.scalars(
+        select(Notification)
+        .where(
+            Notification.recipient_user_id == user.id,
+            Notification.is_read.is_(True),
+        )
+        .options(selectinload(Notification.actor))
+        .order_by(Notification.read_at.desc(), Notification.created_at.desc(), Notification.id.desc())
+        .limit(archived_limit)
+    ).all()
+    notification_unread_count = db.scalar(
+        select(func.count(Notification.id)).where(
+            Notification.recipient_user_id == user.id,
+            Notification.is_read.is_(False),
+        )
+    ) or 0
+    notification_archived_count = db.scalar(
+        select(func.count(Notification.id)).where(
+            Notification.recipient_user_id == user.id,
+            Notification.is_read.is_(True),
+        )
+    ) or 0
+    return {
+        'unread_notifications': unread_notifications,
+        'archived_notifications': archived_notifications,
+        'notification_unread_count': notification_unread_count,
+        'notification_archived_count': notification_archived_count,
+        'notification_total_count': notification_unread_count + notification_archived_count,
+    }
+
+
 @router.get('/', response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)):
     posts = db.scalars(
-        select(Post).where(Post.is_deleted.is_(False)).order_by(Post.published_at.desc(), Post.id.desc())
+        select(Post)
+        .where(Post.is_deleted.is_(False))
+        .order_by(Post.is_pinned.desc(), Post.published_at.desc(), Post.id.desc())
     ).all()
 
     like_rows = db.execute(
@@ -107,6 +159,10 @@ def index(request: Request, db: Session = Depends(get_db)):
 
     like_counts = {post_id: count for post_id, count in like_rows}
     comment_counts = {post_id: count for post_id, count in comment_rows}
+    post_excerpts = {
+        post.id: build_markdown_excerpt(post.content, max_length=120) or '这条帖子没有正文，点击查看完整内容。'
+        for post in posts
+    }
 
     return templates.TemplateResponse(
         request,
@@ -117,6 +173,7 @@ def index(request: Request, db: Session = Depends(get_db)):
             posts=posts,
             like_counts=like_counts,
             comment_counts=comment_counts,
+            post_excerpts=post_excerpts,
             total_like_count=sum(like_counts.values()),
             total_comment_count=sum(comment_counts.values()),
         ),
@@ -143,6 +200,16 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
     liked_by_me = False
     summary_used_by_me = False
+    comment_like_counts: dict[int, int] = {}
+    liked_comment_ids: set[int] = set()
+    comment_ids = [comment.id for comment in comments]
+    if comment_ids:
+        like_rows = db.execute(
+            select(CommentLike.comment_id, func.count(CommentLike.id))
+            .where(CommentLike.comment_id.in_(comment_ids))
+            .group_by(CommentLike.comment_id)
+        ).all()
+        comment_like_counts = {comment_id: count for comment_id, count in like_rows}
     if current_user:
         liked_by_me = db.scalar(
             select(PostLike.id).where(PostLike.post_id == post_id, PostLike.user_id == current_user.id)
@@ -153,6 +220,15 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
                 PostSummaryUsage.user_id == current_user.id,
             )
         ) is not None
+        if comment_ids:
+            liked_comment_ids = set(
+                db.scalars(
+                    select(CommentLike.comment_id).where(
+                        CommentLike.comment_id.in_(comment_ids),
+                        CommentLike.user_id == current_user.id,
+                    )
+                ).all()
+            )
 
     return templates.TemplateResponse(
         request,
@@ -165,10 +241,13 @@ def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
             comment_tree=comment_tree,
             like_count=like_count,
             comment_count=len(comments),
+            comment_like_counts=comment_like_counts,
+            liked_comment_ids=liked_comment_ids,
             liked_by_me=liked_by_me,
             summary_used_by_me=summary_used_by_me,
             summary_visible=bool(current_user and summary_used_by_me and post.ai_summary),
             comment_rate_limit_message=COMMENT_RATE_LIMIT_MESSAGE,
+            post_content_html=render_markdown(post.content),
         ),
     )
 
@@ -377,8 +456,54 @@ def user_profile_page(request: Request, db: Session = Depends(get_db)):
             profile_signature_value=user.signature or '',
             profile_signature_text=user.signature or DEFAULT_SIGNATURE,
             error=None,
+            **load_user_notification_context(db, user),
         ),
     )
+
+
+@router.post('/me/notifications/{notification_id}/read')
+def mark_notification_read(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return redirect_login('/me')
+
+    notification = db.scalar(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.recipient_user_id == user.id,
+        )
+    )
+    if not notification:
+        raise HTTPException(status_code=404, detail='Notification not found')
+
+    if not notification.is_read:
+        notification.is_read = True
+        notification.read_at = cn_now()
+        db.commit()
+        set_flash(request, 'success', '消息已标记为已读，并移入归档。')
+
+    return RedirectResponse(url='/me#notifications-archive', status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post('/me/notifications/{notification_id}/delete')
+def delete_notification(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return redirect_login('/me')
+
+    notification = db.scalar(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.recipient_user_id == user.id,
+        )
+    )
+    if not notification:
+        raise HTTPException(status_code=404, detail='Notification not found')
+
+    db.delete(notification)
+    db.commit()
+    set_flash(request, 'success', '消息已删除。')
+    return RedirectResponse(url='/me#notifications-archive', status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post('/me', response_class=HTMLResponse)
@@ -399,14 +524,32 @@ def user_profile_update(
         return templates.TemplateResponse(
             request,
             'user_profile.html',
-            build_context(request, db, profile_user=user, profile_comment_count=comment_count, error='昵称至少需要 3 个字符。'),
+            build_context(
+                request,
+                db,
+                profile_user=user,
+                profile_comment_count=comment_count,
+                profile_signature_value=clean_signature,
+                profile_signature_text=clean_signature or DEFAULT_SIGNATURE,
+                error='昵称至少需要 3 个字符。',
+                **load_user_notification_context(db, user),
+            ),
             status_code=400,
         )
     if len(clean_username) > 20:
         return templates.TemplateResponse(
             request,
             'user_profile.html',
-            build_context(request, db, profile_user=user, profile_comment_count=comment_count, error='昵称不能超过 50 个字符。'),
+            build_context(
+                request,
+                db,
+                profile_user=user,
+                profile_comment_count=comment_count,
+                profile_signature_value=clean_signature,
+                profile_signature_text=clean_signature or DEFAULT_SIGNATURE,
+                error='昵称不能超过 50 个字符。',
+                **load_user_notification_context(db, user),
+            ),
             status_code=400,
         )
 
@@ -419,7 +562,16 @@ def user_profile_update(
         return templates.TemplateResponse(
             request,
             'user_profile.html',
-            build_context(request, db, profile_user=user, profile_comment_count=comment_count, error='这个昵称已经被别人使用了。'),
+            build_context(
+                request,
+                db,
+                profile_user=user,
+                profile_comment_count=comment_count,
+                profile_signature_value=clean_signature,
+                profile_signature_text=clean_signature or DEFAULT_SIGNATURE,
+                error='这个昵称已经被别人使用了。',
+                **load_user_notification_context(db, user),
+            ),
             status_code=400,
         )
 
@@ -478,6 +630,45 @@ def toggle_like(post_id: int, request: Request, db: Session = Depends(get_db)):
     return RedirectResponse(url=f'/posts/{post_id}#interact', status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post('/posts/{post_id}/comments/{comment_id}/like')
+def toggle_comment_like(
+    post_id: int,
+    comment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    post = db.get(Post, post_id)
+    if not post or post.is_deleted:
+        raise HTTPException(status_code=404, detail='Post not found')
+
+    comment = db.get(Comment, comment_id)
+    if not comment or comment.post_id != post_id:
+        raise HTTPException(status_code=404, detail='Comment not found')
+
+    user = get_current_user(request, db)
+    if not user:
+        return redirect_login(f'/posts/{post_id}#comment-{comment_id}')
+
+    existing = db.scalar(
+        select(CommentLike).where(CommentLike.comment_id == comment_id, CommentLike.user_id == user.id)
+    )
+    if existing:
+        db.delete(existing)
+        remove_comment_like_notification(
+            db,
+            actor_user_id=user.id,
+            comment_owner_user_id=comment.user_id,
+            comment_id=comment.id,
+        )
+        set_flash(request, 'success', '已取消评论点赞。')
+    else:
+        db.add(CommentLike(comment_id=comment_id, user_id=user.id))
+        notify_comment_liked(db, actor=user, liked_comment=comment, post=post)
+        set_flash(request, 'success', '评论点赞成功。')
+    db.commit()
+    return RedirectResponse(url=f'/posts/{post_id}#comment-{comment_id}', status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post('/posts/{post_id}/comments')
 def create_comment(
     post_id: int,
@@ -526,6 +717,15 @@ def create_comment(
         content=clean_content,
     )
     db.add(comment)
+    db.flush()
+    if reply_parent:
+        notify_comment_reply(
+            db,
+            replier=user,
+            reply_comment=comment,
+            parent_comment=reply_parent,
+            post=post,
+        )
     if now:
         user.next_comment_at = now + COMMENT_COOLDOWN
     db.commit()

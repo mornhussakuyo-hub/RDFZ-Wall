@@ -50,6 +50,9 @@
     {% for post in posts %}
     <article class="card post-card">
         <a class="card-cover" href="/posts/{{ post.id }}">
+            {% if post.is_pinned %}
+            <span class="card-pin-badge" title="置顶帖" aria-label="置顶帖">📌 置顶</span>
+            {% endif %}
             {% if post.cover %}
             <img src="{{ post.cover }}" alt="帖子封面">
             {% elif post.videos %}
@@ -63,14 +66,16 @@
         </a>
         <div class="card-body">
             <div class="meta-row">
-                <span class="meta">{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="meta">
+                    {% if post.is_pinned %}置顶 · {% endif %}{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}
+                </span>
                 <div class="chips">
                     {% if post.videos %}<span class="chip">视频 {{ post.videos|length }}</span>{% endif %}
                     {% if post.images %}<span class="chip">图片 {{ post.images|length }}</span>{% endif %}
                 </div>
             </div>
             <h2><a href="/posts/{{ post.id }}">{{ post.title or ('无标题 #' ~ post.id) }}</a></h2>
-            <p class="excerpt">{{ (post.content or '这条帖子没有正文，点击查看完整内容。')[:120] }}{% if post.content and (post.content|length) > 120 %}...{% endif %}</p>
+            <p class="excerpt">{{ post_excerpts.get(post.id, '这条帖子没有正文，点击查看完整内容。') }}</p>
             <div class="card-footer">
                 <span>👍 {{ like_counts.get(post.id, 0) }}</span>
                 <span>💬 {{ comment_counts.get(post.id, 0) }}</span>

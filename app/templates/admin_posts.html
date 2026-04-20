@@ -36,13 +36,22 @@
             {% for post in posts %}
             <tr>
                 <td>{{ post.id }}</td>
-                <td>{{ post.title or ('无标题 #' ~ post.id) }}</td>
+                <td>
+                    <div class="admin-post-title">
+                        <span>{{ post.title or ('无标题 #' ~ post.id) }}</span>
+                        {% if post.is_pinned %}
+                        <span class="pin-indicator" title="置顶帖" aria-label="置顶帖">📌 置顶</span>
+                        {% endif %}
+                    </div>
+                </td>
                 <td>{{ post.images|length }}</td>
                 <td>{{ post.videos|length }}</td>
                 <td>{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td>
                     {% if post.is_deleted %}
                     <span class="badge muted">已删除</span>
+                    {% elif post.is_pinned %}
+                    <span class="badge ok">已置顶</span>
                     {% else %}
                     <span class="badge ok">已发布</span>
                     {% endif %}
@@ -61,8 +70,15 @@
                 </td>
                 <td>
                     <div class="row-actions" data-admin-post-row data-post-id="{{ post.id }}" data-generating="{{ 'true' if post.ai_summary_generating else 'false' }}">
-                        <a class="button secondary small" href="/posts/{{ post.id }}" target="_blank">查看</a>
                         {% if not post.is_deleted %}
+                        <a class="button secondary small" href="/posts/{{ post.id }}" target="_blank">查看</a>
+                        {% endif %}
+                        {% if not post.is_deleted %}
+                        <form method="post" action="/admin/posts/{{ post.id }}/pin">
+                            <button class="button secondary small" type="submit">
+                                {% if post.is_pinned %}取消置顶{% else %}设为置顶{% endif %}
+                            </button>
+                        </form>
                         <form
                             method="post"
                             action="/admin/posts/{{ post.id }}/ai-summary/regenerate"
@@ -75,6 +91,10 @@
                         </form>
                         <form method="post" action="/admin/posts/{{ post.id }}/delete" onsubmit="return confirm('确认删除这条帖子？');">
                             <button class="button danger small" type="submit">删除</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="/admin/posts/{{ post.id }}/restore" onsubmit="return confirm('确认恢复这条帖子？');">
+                            <button class="button primary small" type="submit">恢复</button>
                         </form>
                         {% endif %}
                     </div>

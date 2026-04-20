@@ -57,6 +57,8 @@ def initialize_database() -> None:
 
         if 'posts' in tables:
             columns = {column['name'] for column in inspector.get_columns('posts')}
+            if 'is_pinned' not in columns:
+                conn.execute(text("ALTER TABLE posts ADD COLUMN is_pinned BOOLEAN NOT NULL DEFAULT 0"))
             if 'videos_json' not in columns:
                 conn.execute(text("ALTER TABLE posts ADD COLUMN videos_json TEXT NOT NULL DEFAULT '[]'"))
             if 'ai_summary' not in columns:
@@ -65,8 +67,23 @@ def initialize_database() -> None:
                 conn.execute(text("ALTER TABLE posts ADD COLUMN ai_summary_updated_at DATETIME"))
             if 'ai_summary_generating' not in columns:
                 conn.execute(text("ALTER TABLE posts ADD COLUMN ai_summary_generating BOOLEAN NOT NULL DEFAULT 0"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_posts_is_pinned ON posts (is_pinned)"))
 
         if 'comments' in tables:
             columns = {column['name'] for column in inspector.get_columns('comments')}
             if 'parent_id' not in columns:
                 conn.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
+
+        if 'notifications' in tables:
+            columns = {column['name'] for column in inspector.get_columns('notifications')}
+            if 'payload_json' not in columns:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}'"))
+            if 'is_read' not in columns:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
+            if 'read_at' not in columns:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN read_at DATETIME"))
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_notifications_recipient_user_id ON notifications (recipient_user_id)")
+            )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notifications_type ON notifications (type)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notifications_is_read ON notifications (is_read)"))
